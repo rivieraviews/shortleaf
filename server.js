@@ -2,12 +2,11 @@ import express from 'express';
 import cors from 'cors';
 import { nanoid } from 'nanoid';
 import { z } from 'zod';
+import { insertUrl, getUrl, urlExists } from './db.js';
 
 const app = express();
 app.use(cors());
 app.use(express.json());
-
-const urlDatabase = new Map();
 
 //schema for URL shortening validation
 const shortenSchema = z.object({
@@ -38,19 +37,22 @@ app.post('/shorten', (req, res) => {
     let attempts = 0;
     const maxAttempts = 5;
 
-    do {
+    while (attempts < maxAttempts) {
         shortId = nanoid(6);
+        const exists = urlExists.get(shortId);
+        if (!exists) break; //unique id found
         attempts++;
+    }
 
-        if (attempts >= maxAttempts) 
-        {
-            return res.status(500).json({
-                error: "Unable to generate a unique short URL. Please try again."
-            });
-        }
-    } while (urlDatabase.has(shortId));
+    //if we've exhausted attempts and the last generated id still exists, fail
+    if (attempts >= maxAttempts && urlExists.get(shortId)) {
+        return res.status(500).json({
+            error: "Unable to generate a unique short URL. Please try again."
+        });
+    }
 
-    urlDatabase.set(shortId, originalUrl);
+    const createdAt = Date.now();
+    insertUrl.run(shortId, originalUrl, createdAt);
 
     const shortUrl = `${req.protocol}://${req.get("host")}/${shortId}`;
     res.json({ shortUrl });
@@ -63,12 +65,14 @@ app.post('/shorten', (req, res) => {
 
 app.get('/:shortId', (req, res) => {
     const { shortId } = req.params;
-    const originalUrl = urlDatabase.get(shortId);
+    const row = getUrl.get(shortId);
 
-    if (!originalUrl)
+    if (!row)
         return res.status(404).json({ error: "URL not found." });
 
-    res.redirect(originalUrl);
+    //getUrl returns an object like { original_url: 'https://...' }
+    //extract the string before redirecting
+    res.redirect(row.original_url);
 });
 
 const PORT = process.env.PORT || 3000;
