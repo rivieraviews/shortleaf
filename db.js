@@ -7,7 +7,9 @@ db.exec(`
         short_id TEXT PRIMARY KEY,
         original_url TEXT NOT NULL,
         created_at INTEGER NOT NULL,
-        click_count INTEGER DEFAULT 0
+        click_count INTEGER DEFAULT 0,
+        expires_at INTEGER,
+        max_clicks INTEGER
     )
 `);
 
@@ -17,18 +19,18 @@ db.exec(`
         short_id TEXT NOT NULL,
         clicked_at INTEGER NOT NULL,
         user_agent TEXT,
-        referrer TEXT,
+        referer TEXT,
         FOREIGN KEY (short_id) REFERENCES urls(short_id)
     )
 `);
 
 export const insertUrl = db.prepare(`
-    INSERT INTO urls (short_id, original_url, created_at, click_count)
-    VALUES (?, ?, ?, 0)
+    INSERT INTO urls (short_id, original_url, created_at, click_count, expires_at, max_clicks)
+    VALUES (?, ?, ?, 0, ?, ?)
 `);
 
 export const getUrl = db.prepare(`
-    SELECT original_url, click_count FROM urls WHERE short_id = ?
+    SELECT original_url, click_count, expires_at, max_clicks FROM urls WHERE short_id = ?
 `);
 
 export const urlExists = db.prepare(`
@@ -36,7 +38,7 @@ export const urlExists = db.prepare(`
 `);
 
 export const insertClick = db.prepare(`
-    INSERT INTO clicks (short_id, clicked_at, user_agent, referrer)
+    INSERT INTO clicks (short_id, clicked_at, user_agent, referer)
     VALUES (?, ?, ?, ?)
 `);
 
@@ -49,6 +51,8 @@ export const getStats = db.prepare(`
         u.short_id,
         u.original_url,
         u.created_at,
+        u.expires_at,
+        u.max_clicks,
         u.click_count,
         COUNT(c.id) as total_clicks
     FROM urls u
