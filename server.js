@@ -33,7 +33,23 @@ app.post('/shorten', (req, res) => {
 
     const { originalUrl } = result.data;
 
-    const shortId = nanoid(6);
+    //generating unique shortid and preventing collisions
+    let shortId;
+    let attempts = 0;
+    const maxAttempts = 5;
+
+    do {
+        shortId = nanoid(6);
+        attempts++;
+
+        if (attempts >= maxAttempts) 
+        {
+            return res.status(500).json({
+                error: "Unable to generate a unique short URL. Please try again."
+            });
+        }
+    } while (urlDatabase.has(shortId));
+
     urlDatabase.set(shortId, originalUrl);
 
     const shortUrl = `${req.protocol}://${req.get("host")}/${shortId}`;
