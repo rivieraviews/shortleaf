@@ -2,7 +2,7 @@ import express from 'express';
 import cors from 'cors';
 import { nanoid } from 'nanoid';
 import { z } from 'zod';
-import { insertUrl, getUrl, urlExists } from './db.js';
+import { insertUrl, getUrl, urlExists, incrementClickCount, insertClick, getStats } from './db.js';
 
 const app = express();
 app.use(cors());
@@ -82,17 +82,42 @@ app.post('/shorten', (req, res) => {
     }
 });
 
+//new endpoint for analytics
+app.get('/stats/:shortId', (req, res) => {
+    const { shortId } = req.params;
+    const stats = getStats.get(shortId);
+
+    if (!stats) {
+        return res.status(404).json({ error: "URL not found" });
+    }
+
+    res.json({
+        shortId: stats.short_id,
+        originalUrl: stats.original_url,
+        createdAt: stats.created_at,
+        clickCount: stats.click_count,
+    });
+});
+
+//redirect endpoint with click tracking
 app.get('/:shortId', (req, res) => {
     const { shortId } = req.params;
     const row = getUrl.get(shortId);
 
     if (!row)
-        return res.status(404).json({ error: "URL not found." });
+    {
+        return res.status(404).json({ error: "URL not found" });
+    }
 
-    //getUrl returns an object like { original_url: 'https://...' }
-    //extract the string before redirecting
+    const clickedAt = Date.now();
+    const userAgent = req.get('user-agent') || null;
+    const referrer = req.get('referer') || null;
+
+    incrementClickCount.run(shortId);
+    insertClick.run(shortId, clickedAt, userAgent, referrer);
+
     res.redirect(row.original_url);
-});
+})
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => console.log(`shortleaf running on port ${PORT}`));
