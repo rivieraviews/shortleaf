@@ -5,6 +5,11 @@ node_modules/
 .env
 .env*.local
 
+#db files
+*.sqlite
+*.sqlite3
+*.db
+
 #editor directories
 .vscode/
 .idea/
