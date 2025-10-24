@@ -10,7 +10,12 @@ app.use(express.json());
 
 //schema for URL shortening validation
 const shortenSchema = z.object({
-    originalUrl: z.string().regex(/^https?:\/\/.+/, { message: "Invalid URL format. Must be a valid URL with protocol (http:// or https://)." })
+    originalUrl: z.string().regex(/^https?:\/\/.+/, { message: "Invalid URL format. Must be a valid URL with protocol (http:// or https://)." }),
+    customId: z.string()
+        .min(3, { message : "Custom ID must be at least 3 characters." })
+        .max(20, { message : "Custom ID must be at most 20 characters." })
+        .regex(/^[a-zA-Z0-9_-]+$/, { message: "Custom ID can only contain letters, numbers, underscores, and hyphens."})
+        .optional()
 });
 
 app.post('/shorten', (req, res) => {
@@ -30,25 +35,39 @@ app.post('/shorten', (req, res) => {
             });
         }
 
-    const { originalUrl } = result.data;
+    const { originalUrl, customId } = result.data;
 
-    //generating unique shortid and preventing collisions
     let shortId;
-    let attempts = 0;
-    const maxAttempts = 5;
 
-    while (attempts < maxAttempts) {
-        shortId = nanoid(6);
-        const exists = urlExists.get(shortId);
-        if (!exists) break; //unique id found
-        attempts++;
+    if (customId)
+    {
+        if (urlExists.get(customId))
+        {
+            return res.status(409).json({
+                error: "Custom ID is already in use. Please choose another."
+            });
+        }
+        shortId = customId;
     }
+    else
+    {
+        //generating unique shortid and preventing collisions
+        let attempts = 0;
+        const maxAttempts = 5;
 
-    //if we've exhausted attempts and the last generated id still exists, fail
-    if (attempts >= maxAttempts && urlExists.get(shortId)) {
-        return res.status(500).json({
-            error: "Unable to generate a unique short URL. Please try again."
-        });
+        while (attempts < maxAttempts) {
+            shortId = nanoid(6);
+            const exists = urlExists.get(shortId);
+            if (!exists) break; //unique id found
+            attempts++;
+        }
+
+        //if we've exhausted attempts and the last generated id still exists, fail
+        if (attempts >= maxAttempts && urlExists.get(shortId)) {
+            return res.status(500).json({
+                error: "Unable to generate a unique short URL. Please try again."
+            });
+        }
     }
 
     const createdAt = Date.now();
