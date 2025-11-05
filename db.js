@@ -43,7 +43,7 @@ export const insertClick = db.prepare(`
 `);
 
 export const incrementClickCount = db.prepare(`
-    UPDATE urls SET click_count = click_count + 1 WHERE short_id = ?\
+    UPDATE urls SET click_count = click_count + 1 WHERE short_id = ?
 `);
 
 export const getStats = db.prepare(`
